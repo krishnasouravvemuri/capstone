@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ReflectAI – Emotion Recognition</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #dbe6f6 0%, #c5796d 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      color: #222;
+      margin-bottom: 20px;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .video-container {
+      position: relative;
+      width: 640px;
+      height: 480px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 640px;
+      height: 480px;
+      border-radius: 10px;
+      z-index: 1;
+      background: #000;
+      object-fit: cover;
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 640px;
+      height: 480px;
+      border-radius: 10px;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    #emotion-box {
+      margin-top: 20px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      background: #ffffffcc;
+      padding: 10px 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    #capture-btn {
+      margin-top: 15px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1.1rem;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s ease;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+    }
+
+    #capture-btn:hover {
+      background: #0056b3;
+      transform: scale(1.03);
+    }
+
+    #mode-popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 25px;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      z-index: 10;
+      text-align: center;
+    }
+
+    #mode-popup button {
+      width: 150px;
+      padding: 10px;
+      font-size: 1rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      background: #007bff;
+      color: white;
+      transition: background 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    #mode-popup button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+  <h1>ReflectAI</h1>
+
+  <div class="video-container">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="overlay"></canvas>
+  </div>
+
+  <div id="emotion-box">Waiting for camera...</div>
+
+  <button id="capture-btn">🎯 Capture Emotion</button>
+
+  <div id="mode-popup">
+    <p style="font-size:1.1rem;font-weight:600;">Where do you want to go?</p>
+    <button id="music-btn">🎵 Spotify</button>
+    <button id="movie-btn">🎬 Movies</button>
+  </div>
+
+  <script>
+    const API = "http://127.0.0.1:8000/api";
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("overlay");
+    const ctx = canvas.getContext("2d");
+    const emotionBox = document.getElementById("emotion-box");
+    const captureBtn = document.getElementById("capture-btn");
+    const popup = document.getElementById("mode-popup");
+    const musicBtn = document.getElementById("music-btn");
+    const movieBtn = document.getElementById("movie-btn");
+
+    let emotion = null;
+    let isCapturing = false;
+    let ready = false;
+
+    async function initCam() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter(d => d.kind === 'videoinput');
+
+        let finalStream = stream;
+        if (cameras.length > 1) {
+          stream.getTracks().forEach(t => t.stop());
+          finalStream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: cameras[0].deviceId }
+          });
+        }
+
+        video.srcObject = finalStream;
+
+        video.onloadedmetadata = () => {
+          video.play();
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ready = true;
+          emotionBox.textContent = "Camera ready. Detecting emotion...";
+          console.log("Camera initialized ✅");
+        };
+      } catch (err) {
+        alert("Camera access failed: " + err.message);
+        console.error(err);
+      }
+    }
+
+    async function sendFrame() {
+      if (!ready || !video.srcObject) return;
+
+      const off = document.createElement("canvas");
+      off.width = video.videoWidth;
+      off.height = video.videoHeight;
+      const offCtx = off.getContext("2d");
+      offCtx.drawImage(video, 0, 0, off.width, off.height);
+
+      const blob = await new Promise(res => off.toBlob(res, "image/jpeg", 0.6));
+      const form = new FormData();
+      form.append("image", blob, "frame.jpg");
+
+      try {
+        const resp = await fetch(`${API}/detect/`, { method: "POST", body: form });
+        const data = await resp.json();
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#00aaff"; // blue box
+        ctx.font = "16px Segoe UI";
+        ctx.fillStyle = "#00aaff";
+
+        if (data.faces && data.faces.length > 0) {
+          data.faces.forEach(f => {
+            ctx.strokeRect(f.x, f.y, f.w, f.h);
+            ctx.fillText(f.emotion, f.x + 5, f.y - 10);
+          });
+        }
+
+        if (data.dominant_emotion && data.dominant_emotion !== "No Faces Detected") {
+          emotion = data.dominant_emotion;
+          emotionBox.textContent = `Detected Emotion: ${emotion.toUpperCase()}`;
+        } else {
+          emotionBox.textContent = "No face detected.";
+        }
+
+      } catch (err) {
+        console.error("Detection error:", err);
+      }
+    }
+
+    async function startLoop() {
+      await initCam();
+      setInterval(() => {
+        if (!isCapturing) sendFrame();
+      }, 1000);
+    }
+
+    captureBtn.onclick = () => {
+      if (!emotion) {
+        alert("No emotion detected yet!");
+        return;
+      }
+      popup.style.display = "flex";
+    };
+
+    musicBtn.onclick = async () => {
+      popup.style.display = "none";
+      const res = await fetch(`${API}/recommend/?emotion=${emotion}&mode=spotify`);
+      const data = await res.json();
+      emotionBox.textContent = `🎵 Opening music for ${emotion.toUpperCase()}...`;
+      window.open(data.recommendation_url, "_blank");
+    };
+
+    movieBtn.onclick = async () => {
+      popup.style.display = "none";
+      const res = await fetch(`${API}/recommend/?emotion=${emotion}&mode=movies`);
+      const data = await res.json();
+      emotionBox.textContent = `🎬 Opening movies for ${emotion.toUpperCase()}...`;
+      window.open(data.recommendation_url, "_blank");
+    };
+
+    startLoop();
+  </script>
+</body>
+</html>
