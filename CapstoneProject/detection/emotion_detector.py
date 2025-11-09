@@ -1,4 +1,3 @@
-# detection/emotion_detector.py
 import os
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
@@ -8,7 +7,6 @@ import numpy as np
 from deepface import DeepFace
 from collections import Counter
 
-# Load more robust detector: Haar Cascade fallback
 face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
@@ -34,7 +32,7 @@ def analyze_emotion(image_bytes):
         print("[ERROR] Invalid image input")
         return {"dominant_emotion": "Invalid Image", "faces": []}
 
-    # Preprocess to normalize lighting
+    
     frame = preprocess_image(frame)
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -48,23 +46,23 @@ def analyze_emotion(image_bytes):
         face_roi = frame[y:y+h, x:x+w]
 
         try:
-            # ✅ Use a better backend for accuracy — 'retinaface' or 'mtcnn' (if installed)
+            
             result = DeepFace.analyze(
                 face_roi,
                 actions=['emotion'],
                 enforce_detection=False,
                 silent=True,
-                detector_backend='retinaface'  # much better face alignment
+                detector_backend='retinaface'  
             )
 
-            # DeepFace sometimes returns a list
+            
             if isinstance(result, list):
                 result = result[0]
 
             emotion = result['dominant_emotion']
             confidence = result['emotion'][emotion]
 
-            # Slightly lower confidence threshold to avoid missing subtle emotions
+            
             if confidence > 30:
                 emotions.append(emotion)
                 boxes.append({

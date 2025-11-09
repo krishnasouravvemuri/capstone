@@ -1,6 +1,6 @@
 MOVIE_URLS = {
     "happy": "https://www.themoviedb.org/genre/35-movie",
-    "sad": "https://www.themoviedb.org/genre/18-movie",
+    "sad": "https://www.themoviedb.org/genre/10751-family/movie",
     "angry": "https://www.themoviedb.org/genre/28-movie",
     "fear": "https://www.themoviedb.org/genre/27-movie",
     "surprise": "https://www.themoviedb.org/genre/878-movie",
