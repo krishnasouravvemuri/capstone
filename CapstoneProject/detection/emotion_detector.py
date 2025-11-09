@@ -14,7 +14,7 @@ face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
-def analyze_emotion_live():
+def analyze_emotion():
     """
     Captures frames for 2.5 seconds and detects dominant emotion using DeepFace.
     Returns overall dominant emotion and last known bounding boxes.
@@ -79,5 +79,5 @@ def analyze_emotion_live():
     }
 
 if __name__ == "__main__":
-    result = analyze_emotion_live()
+    result = analyze_emotion()
     print(result)
